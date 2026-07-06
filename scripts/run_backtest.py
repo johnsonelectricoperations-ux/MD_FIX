@@ -21,14 +21,18 @@ from stock.data import load_from_cache, load_price_table
 from stock.metrics import summarize
 from stock.strategy import StrategyConfig, target_weights
 
-# Variants for --compare. Band 0 shows why the rebalance band exists.
+# Variants for --compare. "구버전" replicates the pre-diagnosis strategy
+# (no trend filter, no cooldown) so improvements are measured, not assumed.
 COMPARE_VARIANTS: dict[str, tuple[StrategyConfig, float]] = {
-    "기본 (변동성목표 15%)": (StrategyConfig(), REBALANCE_BAND),
-    "변동성목표 20%": (StrategyConfig(vol_target=0.20), REBALANCE_BAND),
-    "변동성목표 25%": (StrategyConfig(vol_target=0.25), REBALANCE_BAND),
-    "변동성 조절 끔": (StrategyConfig(vol_target=99.0), REBALANCE_BAND),
-    "급락대피 -7%로 강화": (StrategyConfig(crash_drawdown=0.07), REBALANCE_BAND),
-    "밴드 없음 (기본설정)": (StrategyConfig(), 0.0),
+    "기본 (추세필터+냉각 ON)": (StrategyConfig(), REBALANCE_BAND),
+    "추세필터만 끔": (StrategyConfig(trend_filter_days=0), REBALANCE_BAND),
+    "냉각기간만 끔": (StrategyConfig(crash_cooldown_days=0), REBALANCE_BAND),
+    "구버전 (둘 다 끔)": (
+        StrategyConfig(trend_filter_days=0, crash_cooldown_days=0),
+        REBALANCE_BAND,
+    ),
+    "기본 + 변동성목표 20%": (StrategyConfig(vol_target=0.20), REBALANCE_BAND),
+    "기본 + 변동성목표 25%": (StrategyConfig(vol_target=0.25), REBALANCE_BAND),
 }
 
 
@@ -80,7 +84,9 @@ def main() -> int:
     print(f"백테스트 기간: {first} ~ {last} ({len(prices)} 거래일)")
     print(f"거래비용 가정: 편도 {COST_RATE:.3%} / 신호 다음 날 체결 (look-ahead 방지)")
     print(f"설정: 모멘텀 {config.lookbacks}일, 변동성 목표 {config.vol_target:.0%}, ")
-    print(f"      급락 대피 {config.crash_window}일 내 -{config.crash_drawdown:.0%}, ")
+    print(f"      급락 대피 {config.crash_window}일 내 -{config.crash_drawdown:.0%} ")
+    print(f"      (대피 후 {config.crash_cooldown_days}일 재진입 금지), ")
+    print(f"      추세 필터 {config.trend_filter_days}일 이평선, ")
     print(f"      리밸런싱 밴드 {REBALANCE_BAND:.0%}, 평균 주식 비중 {average_exposure:.0%}")
     print()
     print_row(
