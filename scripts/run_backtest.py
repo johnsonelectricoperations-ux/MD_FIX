@@ -16,19 +16,10 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from stock.backtest import BacktestResult, run_backtest
+from stock.config import CASH_ASSET, COST_RATE, REBALANCE_BAND, RISKY_ASSETS
 from stock.data import load_from_cache, load_price_table
 from stock.metrics import summarize
 from stock.strategy import StrategyConfig, target_weights
-
-# Keep in sync with scripts/fetch_data.py.
-RISKY_ASSETS = {
-    "069500.KS": "KODEX 200",
-    "229200.KS": "KODEX 코스닥150",
-    "360750.KS": "TIGER 미국S&P500",
-}
-CASH_ASSET = "153130.KS"  # KODEX money-market ETF
-COST_RATE = 0.0005  # commission + slippage per side; KR ETFs have no transaction tax
-REBALANCE_BAND = 0.10  # skip re-orders until target weight drifts >10%p
 
 # Variants for --compare. Band 0 shows why the rebalance band exists.
 COMPARE_VARIANTS: dict[str, tuple[StrategyConfig, float]] = {

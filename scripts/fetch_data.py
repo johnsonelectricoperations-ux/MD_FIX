@@ -14,15 +14,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from stock.config import UNIVERSE
 from stock.data import DEFAULT_CACHE_DIR, fetch_daily_closes, save_to_cache
 
-# Universe (D-006): risky candidates + cash asset. Keep in sync with run_backtest.py.
-UNIVERSE = {
-    "069500.KS": "KODEX 200",
-    "229200.KS": "KODEX KOSDAQ150",
-    "360750.KS": "TIGER US S&P500",
-    "153130.KS": "KODEX money-market (cash)",
-}
 START_DATE = "2005-01-01"  # fetch as much history as each ETF has
 
 
