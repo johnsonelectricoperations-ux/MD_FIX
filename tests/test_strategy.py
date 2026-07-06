@@ -3,8 +3,8 @@ import pandas as pd
 
 from stock.strategy import StrategyConfig, target_weights
 
-# Baseline config with the newer layers (trend filter, cooldown) disabled so
-# each test exercises exactly one mechanism.
+# Baseline config with the newer layers (trend filter, cooldown, entry
+# hysteresis) disabled so each test exercises exactly one mechanism.
 CONFIG = StrategyConfig(
     lookbacks=(20, 40),
     vol_window=10,
@@ -12,6 +12,7 @@ CONFIG = StrategyConfig(
     crash_drawdown=0.10,
     crash_cooldown_days=0,
     trend_filter_days=0,
+    entry_threshold=0.0,
 )
 
 
@@ -67,6 +68,7 @@ def test_trend_filter_blocks_asset_below_moving_average():
         crash_drawdown=0.10,
         crash_cooldown_days=0,
         trend_filter_days=0,
+        entry_threshold=0.0,
     )
     with_filter = StrategyConfig(
         lookbacks=(5, 10),
@@ -75,6 +77,7 @@ def test_trend_filter_blocks_asset_below_moving_average():
         crash_drawdown=0.10,
         crash_cooldown_days=0,
         trend_filter_days=50,
+        entry_threshold=0.0,
     )
     tail = slice(115, 130)
     assert target_weights(prices, base)["X"].iloc[tail].max() > 0.0
@@ -100,6 +103,7 @@ def test_crash_cooldown_delays_re_entry():
             crash_drawdown=0.10,
             crash_cooldown_days=cooldown,
             trend_filter_days=0,
+            entry_threshold=0.0,
         )
 
     without = target_weights(prices, config(0))["X"]
@@ -123,6 +127,42 @@ def test_falls_back_to_second_best_asset_when_best_is_crashing():
     weights = target_weights(prices, CONFIG)
     assert weights["A"].iloc[-1] == 0.0
     assert weights["B"].iloc[-1] > 0.0
+
+
+def hysteresis_config(threshold: float) -> StrategyConfig:
+    return StrategyConfig(
+        lookbacks=(20, 40),
+        vol_window=10,
+        crash_window=10,
+        crash_drawdown=0.10,
+        crash_cooldown_days=0,
+        trend_filter_days=0,
+        entry_threshold=threshold,
+    )
+
+
+def test_entry_threshold_blocks_weak_new_positions():
+    # Flat, then a feeble +0.05%/day drift: momentum is barely positive
+    # (~1.5% at best), which is exactly the zero-hover regime that caused
+    # daily in/out churn in 2022. A 2% entry threshold must never enter.
+    factors = np.array([1.0] * 60 + [1.0005] * 60)
+    index = pd.bdate_range("2024-01-01", periods=len(factors))
+    prices = pd.DataFrame({"X": 100.0 * np.cumprod(factors)}, index=index)
+
+    assert target_weights(prices, hysteresis_config(0.0))["X"].max() > 0.0
+    assert target_weights(prices, hysteresis_config(0.02))["X"].max() == 0.0
+
+
+def test_incumbent_survives_momentum_fade_below_entry_threshold():
+    # Strong rise (enters well above the threshold), then a slow crawl that
+    # decays momentum to ~0.6%: below the entry threshold but still positive,
+    # so the position must be KEPT, not churned out.
+    factors = np.array([1.005] * 60 + [1.0002] * 60)
+    index = pd.bdate_range("2024-01-01", periods=len(factors))
+    prices = pd.DataFrame({"X": 100.0 * np.cumprod(factors)}, index=index)
+
+    weights = target_weights(prices, hysteresis_config(0.02))["X"]
+    assert weights.iloc[45:].min() > 0.0  # held continuously once entered
 
 
 def test_crash_circuit_breaker_forces_cash():

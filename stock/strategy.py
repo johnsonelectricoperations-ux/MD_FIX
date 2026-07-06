@@ -4,7 +4,10 @@ Layers, evaluated daily on close prices. Candidates are tried in momentum
 order (best first); the first one passing every gate is held:
 1. Momentum selection: rank assets by average momentum over the configured
    lookbacks. If even the best score is not positive, hold cash (absolute
-   momentum filter).
+   momentum filter). Entry is asymmetric (hysteresis): a NEW position needs
+   momentum >= entry_threshold, while the incumbent stays until its momentum
+   drops to zero. Added after the 2022 diagnosis: scores hovering around zero
+   flipped the portfolio in and out of cash on consecutive days.
 2. Trend regime filter: an asset trading below its long moving average is
    ineligible no matter how its momentum ranks. Added after the 2022
    diagnosis: bear-market rallies kept re-selecting the "least bad" asset.
@@ -37,7 +40,8 @@ class StrategyConfig:
 
     lookbacks: tuple[int, ...] = (63, 126)  # ~3 and ~6 months, in trading days
     absolute_filter: bool = True  # go to cash when best momentum <= 0
-    vol_target: float = 0.15  # annualized volatility target (layer 4)
+    entry_threshold: float = 0.02  # minimum momentum for NEW entries; 0 disables
+    vol_target: float = 0.20  # annualized volatility target (layer 4, D-010)
     vol_window: int = 20  # days used to estimate realized volatility
     crash_window: int = 10  # days of recent high for the circuit breaker
     crash_drawdown: float = 0.10  # 10% drop from recent high -> skip asset (layer 3)
@@ -68,6 +72,7 @@ def target_weights(prices: pd.DataFrame, cfg: StrategyConfig | None = None) -> p
 
     weights = pd.DataFrame(0.0, index=prices.index, columns=prices.columns)
     blocked_until: dict[str, int] = {}  # asset -> last row index of its cooldown
+    incumbent: str | None = None  # asset selected on the previous day
     for i in range(len(prices)):
         # Layer 3 trigger runs for every asset (held or not) BEFORE selection:
         # an exit via the momentum filter must not bypass the cooldown.
@@ -77,9 +82,12 @@ def target_weights(prices: pd.DataFrame, cfg: StrategyConfig | None = None) -> p
         row = scores.iloc[i]
         if row.isna().any():
             continue  # momentum warmup
+        selected: str | None = None
         for asset in row.sort_values(ascending=False).index:
             if cfg.absolute_filter and row[asset] <= 0:
                 break  # layer 1: nothing left is trending up -> cash
+            if asset != incumbent and row[asset] < cfg.entry_threshold:
+                continue  # layer 1 hysteresis: too weak to open a NEW position
             if trend_sma is not None:
                 sma = trend_sma.iloc[i][asset]
                 if pd.isna(sma) or prices.iloc[i][asset] <= sma:
@@ -92,5 +100,7 @@ def target_weights(prices: pd.DataFrame, cfg: StrategyConfig | None = None) -> p
             else:
                 weight = min(1.0, cfg.vol_target / vol)  # layer 4
             weights.iloc[i, weights.columns.get_loc(asset)] = weight
+            selected = asset
             break  # hold exactly one asset
+        incumbent = selected
     return weights

@@ -21,18 +21,19 @@ from stock.data import load_from_cache, load_price_table
 from stock.metrics import summarize
 from stock.strategy import StrategyConfig, target_weights
 
-# Variants for --compare. "구버전" replicates the pre-diagnosis strategy
-# (no trend filter, no cooldown) so improvements are measured, not assumed.
+# Variants for --compare. "구버전" replicates the pre-diagnosis strategy so
+# improvements are measured, not assumed. Base config is D-009/D-010.
 COMPARE_VARIANTS: dict[str, tuple[StrategyConfig, float]] = {
-    "기본 (추세필터+냉각 ON)": (StrategyConfig(), REBALANCE_BAND),
+    "기본 (전체 ON, 목표 20%)": (StrategyConfig(), REBALANCE_BAND),
+    "진입문턱만 끔": (StrategyConfig(entry_threshold=0.0), REBALANCE_BAND),
     "추세필터만 끔": (StrategyConfig(trend_filter_days=0), REBALANCE_BAND),
     "냉각기간만 끔": (StrategyConfig(crash_cooldown_days=0), REBALANCE_BAND),
-    "구버전 (둘 다 끔)": (
-        StrategyConfig(trend_filter_days=0, crash_cooldown_days=0),
+    "구버전 (셋 다 끔)": (
+        StrategyConfig(trend_filter_days=0, crash_cooldown_days=0, entry_threshold=0.0),
         REBALANCE_BAND,
     ),
-    "기본 + 변동성목표 20%": (StrategyConfig(vol_target=0.20), REBALANCE_BAND),
-    "기본 + 변동성목표 25%": (StrategyConfig(vol_target=0.25), REBALANCE_BAND),
+    "변동성목표 15%": (StrategyConfig(vol_target=0.15), REBALANCE_BAND),
+    "변동성목표 25%": (StrategyConfig(vol_target=0.25), REBALANCE_BAND),
 }
 
 
