@@ -41,6 +41,32 @@ def test_constant_weights_trade_only_once():
     assert math.isclose(result.turnover, 0.5, rel_tol=1e-12)
 
 
+def test_rebalance_band_suppresses_daily_jitter():
+    # Target weight wiggles ±2% around 0.5 every day; with a 10%p band the
+    # portfolio should trade once at the start and then hold still.
+    days = 30
+    index = pd.bdate_range("2024-01-01", periods=days)
+    prices = pd.DataFrame({"A": [100.0 + i for i in range(days)]}, index=index)
+    jitter = [0.5 + (0.02 if i % 2 == 0 else -0.02) for i in range(days)]
+    weights = pd.DataFrame({"A": jitter}, index=index)
+    result = run_backtest(prices, weights, cost_rate=0.001, rebalance_band=0.10)
+    assert result.num_trade_days == 1
+
+
+def test_rebalance_band_never_blocks_an_asset_switch():
+    # Rotation from A to B must execute even if the weight sizes are small.
+    days = 10
+    index = pd.bdate_range("2024-01-01", periods=days)
+    prices = pd.DataFrame({"A": [100.0] * days, "B": [100.0] * days}, index=index)
+    weights = pd.DataFrame(0.0, index=index, columns=["A", "B"])
+    weights.loc[index[:5], "A"] = 0.05
+    weights.loc[index[5:], "B"] = 0.05
+    result = run_backtest(prices, weights, cost_rate=0.0, rebalance_band=0.10)
+    # Held weights lag by one day: B must be held from day 7 onward.
+    assert float(result.weights["B"].iloc[-1]) == 0.05
+    assert float(result.weights["A"].iloc[-1]) == 0.0
+
+
 def test_cash_remainder_earns_cash_returns():
     days = 10
     index = pd.bdate_range("2024-01-01", periods=days)
