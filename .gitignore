@@ -1,0 +1,32 @@
+# Secrets — API keys, account numbers, tokens. NEVER commit these.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+
+# Data files (downloaded market data can be large; regenerate instead)
+data/
+*.sqlite3
+*.parquet
+*.csv
+!tests/fixtures/*.csv
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,25 @@
+[project]
+name = "md-fix"
+version = "0.1.0"
+description = "Personal stock investment tooling for KRX and US markets"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle errors
+  "F",   # pyflakes
+  "I",   # isort (import order)
+  "UP",  # pyupgrade
+  "B",   # bugbear (common bugs)
+  "DTZ", # flake8-datetimez: forbid naive datetimes (market data safety)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
