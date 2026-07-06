@@ -16,14 +16,26 @@
 
 - ✅ AI 협업 규칙 체계 구축 (AGENTS.md, CLAUDE.md, DECISIONS.md, ROADMAP.md,
   ruff/editorconfig 설정)
-- ⬜ 아직 애플리케이션 코드 없음 — 다음 단계부터 시작
+- ✅ 전략 결정: ETF 모멘텀 로테이션 + 변동성 목표 + 급락 대피 (D-006)
+- ✅ 프로젝트 뼈대: `stock/` 패키지, `scripts/`, `tests/`, requirements.txt
+- ✅ 데이터 모듈: yfinance 수집 + CSV 캐시 (`stock/data.py`, D-007)
+- ✅ 전략·백테스트 엔진: `stock/strategy.py`, `stock/backtest.py`,
+  `stock/metrics.py` — 합성 데이터 테스트 13개 통과 (look-ahead 방지,
+  급락 대피, 변동성 축소, 비용 계산 검증)
+- ⬜ **실제 데이터로 백테스트 실행 — 사용자 PC에서 필요**
+  (원격 AI 환경은 시세 사이트 접속 차단):
+  1. `pip install -r requirements.txt`
+  2. `python scripts/fetch_data.py` (데이터 다운로드)
+  3. `python scripts/run_backtest.py` (결과 출력)
 
 ## 다음 할 일 (우선순위 순)
 
-1. ⬜ 프로젝트 뼈대 생성: `src/`, `tests/` 구조, `requirements.txt`
-2. ⬜ 데이터 수집 모듈: 한국(pykrx 등)·미국(yfinance 등) 시세 조회
-3. ⬜ 백테스팅 기본 틀
-4. ⬜ 대시보드 / 알림 (이후 결정)
+1. ⬜ 실데이터 백테스트 결과 검토 — 특히 2026-06 급락 구간 손실 확인
+2. ⬜ 설정값 비교 실험 (모멘텀 기간, 급락 대피 기준, 후보군 확장)
+3. ⬜ 급락 구간(2008, 2020, 2022)을 포함한 장기 검증 — ETF 상장 전
+   구간은 지수 데이터로 보완할지 결정 필요
+4. ⬜ 모의투자 연동 (증권사 API 선택 후)
+5. ⬜ 대시보드 / 알림 (이후 결정)
 
 ## 보류 / 미결정 사항
 
