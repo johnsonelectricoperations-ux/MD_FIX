@@ -26,6 +26,13 @@ from dotenv import load_dotenv
 from stock.config import CASH_ASSET, REBALANCE_BAND, RISKY_ASSETS, UNIVERSE
 from stock.data import fetch_daily_closes, load_price_table, save_to_cache
 from stock.kis import Balance, KISClient, KISConfig, KISError
+from stock.limits import (
+    cap_buy_orders,
+    daily_loss_limit_from_env,
+    kill_switch_triggered,
+    max_order_value_from_env,
+    record_account_state,
+)
 from stock.notify import send_telegram
 from stock.rebalance import Order, compute_orders
 from stock.strategy import StrategyConfig, target_weights
@@ -120,7 +127,17 @@ def main() -> int:
                 execute = False
             lines.append(f"KIS 모드: {'모의투자' if config.mode == 'paper' else '실거래'}")
             client = KISClient(config)
-            orders, _, _ = plan_orders(client, targets, lines)
+            orders, balance, prices = plan_orders(client, targets, lines)
+
+            # Guardrails (AGENTS.md §5): never block sells, only new buying.
+            warning = kill_switch_triggered(balance.total_value, daily_loss_limit_from_env())
+            if warning:
+                lines.append(warning)
+                orders = [o for o in orders if o.side == "sell"]
+            orders, capped_notes = cap_buy_orders(orders, prices, max_order_value_from_env())
+            lines.extend(capped_notes)
+            record_account_state(balance.total_value)
+
             if execute and orders:
                 execute_orders(client, orders, lines)
             elif orders:

@@ -92,6 +92,40 @@ crontab -e
 - **코드 업데이트**: EC2에서 `cd MD_FIX && git pull`
 - **비용**: 프리티어는 12개월 무료. 이후 t3.micro 기준 월 1~2만 원 수준이니
   만료 시점을 달력에 표시해 두세요.
-- **실거래 전환**: 모의투자로 최소 1~2개월 검증한 뒤에만. `.env`에서
-  `KIS_MODE=live` + 실전투자용 앱키/계좌로 바꾸고, cron 명령에 `--live`
-  플래그를 추가해야 실주문이 나갑니다 (둘 중 하나만으로는 차단됨).
+
+## 실거래 시작 절차 (D-013: 관찰 1주 → 주문 개시)
+
+실거래는 모의투자와 달리 **실전투자용 앱키**와 실계좌번호를 사용합니다.
+`.env`를 다음과 같이 설정하세요:
+
+```
+KIS_APP_KEY=실전투자용앱키
+KIS_APP_SECRET=실전투자용앱시크릿
+KIS_ACCOUNT_NO=실계좌번호-01
+KIS_MODE=live
+MAX_ORDER_VALUE_KRW=6000000   # 매수 1건 한도 (투입금 500만원 기준)
+DAILY_LOSS_LIMIT_PCT=15       # 계좌가 하루 새 15% 넘게 줄면 신규 매수 차단
+```
+
+**1주차 (관찰 모드)**: cron에 `--execute`를 **넣지 않습니다**. 매일 15:15에
+잔고 조회와 주문 계획만 텔레그램으로 옵니다. 1주간 확인할 것:
+- 계좌 총평가·예수금 금액이 HTS/앱과 일치하는가
+- 주문 계획(종목·수량)이 상식적인가 (총평가를 넘는 수량이 나오면 즉시 중단)
+
+```
+15 15 * * 1-5 cd /home/ubuntu/MD_FIX && .venv/bin/python scripts/daily_signal.py >> logs/daily.log 2>&1
+```
+
+**2주차부터 (주문 개시)**: 1주간 이상이 없으면 cron 명령에
+`--execute --live`를 추가합니다 (`KIS_MODE=live`와 `--live` 둘 다 있어야
+실주문이 나갑니다):
+
+```
+15 15 * * 1-5 cd /home/ubuntu/MD_FIX && .venv/bin/python scripts/daily_signal.py --execute --live >> logs/daily.log 2>&1
+```
+
+**안전장치 동작**: 매수 1건이 `MAX_ORDER_VALUE_KRW`를 넘으면 그 주문만
+차단되고 텔레그램으로 통지됩니다. 계좌 평가액이 직전 실행 대비
+`DAILY_LOSS_LIMIT_PCT` 이상 하락하면 신규 매수가 전부 차단됩니다 (매도,
+즉 현금 대피는 어떤 경우에도 차단되지 않습니다). 킬 스위치 해제는 원인
+확인 후 `data/account_state.json` 삭제 또는 다음 정상 실행으로 자동 갱신.
